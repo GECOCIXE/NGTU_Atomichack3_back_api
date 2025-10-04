@@ -1,4 +1,3 @@
-# scripts/models.py
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from .db import Base
 
@@ -14,5 +13,5 @@ class Document(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     filename = Column(String)
     upload_date = Column(DateTime)
-    analysis_percent = Column(Float, nullable=True)
+    ann_pdf_path = Column(String, nullable=True)
     description = Column(String, nullable=True)

@@ -7,3 +7,4 @@ python-dotenv
 pydantic[email]
 rich
 asyncio
+python-multipart

@@ -1,15 +1,12 @@
-# app.py
-# (Updated file: complete setup with routers, dependencies, and middleware)
-
-from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from jose import jwt, JWTError
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import os
 from scripts.crud import SECRET_KEY, ALGORITHM
-from routers import auth, upload, history, result, download
+from routers import auth, upload , history, result, download
 from scripts.models import Base
 from scripts.db import engine
 
@@ -17,10 +14,8 @@ load_dotenv()
 
 app = FastAPI()
 
-# Create database tables
 Base.metadata.create_all(bind=engine)
 
-# CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,10 +24,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Public paths (no token required)
 PUBLIC_PATHS = {
-    "/auth/login",
-    # Add more if needed, e.g., for registration
+    "/login",
+    # "/upload",
+    "/docs",
+    "/openapi.json",
+    "/reg",
+    # # "/history",
+    # "/result/1",
+    # "/download/1",
+    # "/download_annotated/1"
 }
 
 def _strip_bearer(auth_header: str | None):
@@ -44,7 +45,6 @@ def _strip_bearer(auth_header: str | None):
 
 @app.middleware("http")
 async def jwt_auth_middleware(request: Request, call_next):
-    # Allow OPTIONS and public paths
     if request.method == "OPTIONS" or request.url.path in PUBLIC_PATHS:
         return await call_next(request)
 
@@ -56,23 +56,18 @@ async def jwt_auth_middleware(request: Request, call_next):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         exp = payload.get("exp")
-        if exp is not None:
-            if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(tz=timezone.utc):
-                return JSONResponse(status_code=401, content={"detail": "Token expired"})
-        request.state.user = payload.get("sub")
+        if exp is not None and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(tz=timezone.utc):
+            return JSONResponse(status_code=401, content={"detail": "Token expired"})
+        username: str = payload.get("sub")
+        if username is None:
+            raise JWTError("No sub in token")
+        request.state.user = username
     except JWTError:
         return JSONResponse(status_code=401, content={"detail": "Token is invalid or expired"})
 
     return await call_next(request)
 
-def get_current_user(request: Request = Depends()):
-    user = request.state.user
-    if not user:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-    return user
-
-# Include routers
-app.include_router(auth.router, prefix="/auth")
+app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(history.router)
 app.include_router(result.router)

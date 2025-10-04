@@ -1,12 +1,11 @@
-# scripts/crud.py
 import os
 from dotenv import load_dotenv
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from .models import User, Document
-import hashlib  # Simple hashing; consider bcrypt for production
-
+import hashlib
+from pathlib import Path
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key_here")
@@ -53,11 +52,11 @@ def create_document(db: Session, user_id: int, filename: str, upload_date: datet
     db.refresh(doc)
     return doc
 
-def update_document_analysis(db: Session, doc_id: int, percent: float, description: str):
+def update_document_analysis(db: Session, doc_id: int, ann_pdf_path: str, description: str):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if doc:
-        doc.analysis_percent = percent
-        doc.description = description
+        doc.ann_pdf_path = str(ann_pdf_path)
+        doc.description = str(description)
         db.commit()
         db.refresh(doc)
     return doc

@@ -1,11 +1,10 @@
-# routers/download.py
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from scripts.db import get_db
 from scripts.crud import get_document, get_user_by_login
-from ..app import get_current_user
+from routers.dependencies import get_current_user
 
 router = APIRouter()
 
@@ -17,7 +16,7 @@ def download_original(doc_id: int, db: Session = Depends(get_db), current_user: 
     doc = get_document(db, doc_id)
     if not doc or doc.user_id != user.id:
         raise HTTPException(status_code=404, detail="Document not found")
-    file_path = f"data/original/{doc_id}.pdf"
+    file_path = os.path.join("data", "original", str(doc_id), doc.filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path, filename=doc.filename)
@@ -30,7 +29,10 @@ def download_annotated(doc_id: int, db: Session = Depends(get_db), current_user:
     doc = get_document(db, doc_id)
     if not doc or doc.user_id != user.id:
         raise HTTPException(status_code=404, detail="Document not found")
-    file_path = f"data/annotated/{doc_id}_annotated.pdf"
+    if not doc.ann_pdf_path:
+        raise HTTPException(status_code=404, detail="Annotated file not available")
+    file_path = doc.ann_pdf_path
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Annotated file not found")
-    return FileResponse(file_path, filename=f"{doc.filename}_annotated.pdf")
+    annotated_filename = os.path.basename(file_path)
+    return FileResponse(file_path, filename=annotated_filename)
