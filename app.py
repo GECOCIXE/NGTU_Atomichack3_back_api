@@ -26,14 +26,6 @@ app.add_middleware(
 
 PUBLIC_PATHS = {
     "/login",
-    # "/upload",
-    "/docs",
-    "/openapi.json",
-    "/reg",
-    # # "/history",
-    # "/result/1",
-    # "/download/1",
-    # "/download_annotated/1"
 }
 
 def _strip_bearer(auth_header: str | None):
