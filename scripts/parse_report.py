@@ -28,6 +28,8 @@ def parse_report(report_content: str, doc_id: int = None):
         Пункты: 1.1, 1.1.1
         - (описание/контекст; часто содержит страницу/лист)
         - ...
+    Также обрабатывает глобальные ошибки формата:
+        [GLOBAL] <rule>: <comment>
     """
     lines = report_content.splitlines()
 
@@ -39,10 +41,21 @@ def parse_report(report_content: str, doc_id: int = None):
     for raw in lines:
         line = raw.rstrip("\n")
 
+        # Обработка глобальных ошибок формата [GLOBAL] <rule>: <comment>
+        import re
+        global_match = re.match(r"\[GLOBAL\]\s+([\d.]+):\s*(.*)", line)
+        if global_match:
+            rule = global_match.group(1).strip()
+            comment = global_match.group(2).strip()
+            # Добавляем глобальную ошибку как обычную ошибку
+            oid = _occ_id(rule, comment)
+            occurrences.append((rule, comment, oid, None))  # нет номера ошибки для глобальных
+            error_counts[rule] = error_counts.get(rule, 0) + 1
+            continue
+
         if line.startswith("[#"):
             current_points = []
             # Извлекаем номер ошибки из формата [#013]
-            import re
             match = re.search(r"\[#(\d+)\]", line)
             current_error_num = match.group(1) if match else None
 

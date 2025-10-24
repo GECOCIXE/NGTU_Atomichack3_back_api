@@ -118,9 +118,12 @@ async def upload_file(
 
     similar = bool
 
+    # Заменяем пробелы на дефисы в имени файла
+    safe_filename = file.filename.replace(" ", "-")
+    
     if doc_id is None:
         # создаём новый документ и первую версию
-        doc = create_document(db, user.id, file.filename, upload_date)
+        doc = create_document(db, user.id, safe_filename, upload_date)
         # используем уже импортированную функцию из заголовка файла
         ver = list_versions_for_document(db, doc.id)[0]
 
@@ -135,7 +138,7 @@ async def upload_file(
         doc = get_document(db, doc_id)
         if not doc or doc.user_id != user.id:
             raise HTTPException(status_code=404, detail="Document not found")
-        ver = create_version(db, doc.id, file.filename, upload_date)
+        ver = create_version(db, doc.id, safe_filename, upload_date)
 
     # === ВАЛИДАЦИЯ fixed_ids (если переданы) ===
     occ_map: dict[str, str] = {}  # держим в скоупе функции
@@ -159,7 +162,9 @@ async def upload_file(
     doc_dir = _version_dir(doc.id, ver.version_number)
     os.makedirs(doc_dir, exist_ok=True)
 
-    file_path = f"{doc_dir}/{file.filename}"
+    # Заменяем пробелы на дефисы в имени файла
+    safe_filename = file.filename.replace(" ", "-")
+    file_path = f"{doc_dir}/{safe_filename}"
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 

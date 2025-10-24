@@ -527,7 +527,9 @@ def make_report_files(pdf_path: str, pipeline_out: dict) -> tuple[Path, Path]:
                 criterion_violations.append(v_with_original_num)
         
         if criterion_violations:  # Создаем файл только если есть нарушения по критерию
-            criterion_pdf_path = src.with_name(f"{src.stem}.{criterion}.pdf")
+            # Заменяем пробелы на дефисы в имени файла
+            safe_stem = src.stem.replace(" ", "-")
+            criterion_pdf_path = src.with_name(f"{safe_stem}.{criterion}.pdf")
             doc = fitz.open(pdf_path)
             try:
                 for v in criterion_violations:
@@ -573,7 +575,9 @@ def make_report_files(pdf_path: str, pipeline_out: dict) -> tuple[Path, Path]:
         criteria = v["criteria"]
         
         # Создаем отдельный PDF для каждой ошибки
-        error_pdf_path = src.with_name(f"{src.stem}.error_{error_num:03d}.pdf")
+        # Заменяем пробелы на дефисы в имени файла
+        safe_stem = src.stem.replace(" ", "-")
+        error_pdf_path = src.with_name(f"{safe_stem}.error_{error_num:03d}.pdf")
         doc = fitz.open(pdf_path)
         try:
             p = page_num
