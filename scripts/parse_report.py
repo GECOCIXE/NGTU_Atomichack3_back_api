@@ -1,30 +1,92 @@
-def parse_report(report_content: str):
+# scripts/parse_report.py
+import hashlib
+
+def _natkey(point: str):
+    parts = []
+    for p in point.split("."):
+        try:
+            parts.append(int(p))
+        except Exception:
+            parts.append(p)
+    return tuple(parts)
+
+def _occ_id(point: str, desc: str) -> str:
+    h = hashlib.sha1(f"{point}|{desc}".encode("utf-8")).hexdigest()
+    return h[:12]
+
+def parse_report(report_content: str, doc_id: int = None):
+    """
+    Возвращает:
+      - error_points: список по КАЖДОМУ срабатыванию (по одному элементу на ошибку)
+          { point, description, pdf_url, occ_id, error_num }
+      - error_counts: dict(point -> count)
+      - total_violations: общее число срабатываний
+      - full_report: исходный текст
+      - occurrences: [{id, point, description}] — вспомогательное (можно игнорировать на фронте)
+    Формат входного отчёта прежний:
+        [# ...]
+        Пункты: 1.1, 1.1.1
+        - (описание/контекст; часто содержит страницу/лист)
+        - ...
+    """
     lines = report_content.splitlines()
-    errors = {}
-    points = []
-    
-    for line in lines:
+
+    current_points = []
+    current_error_num = None  # Номер текущей ошибки
+    occurrences = []   # [(point, desc, occ_id, error_num)]
+    error_counts = {}
+
+    for raw in lines:
+        line = raw.rstrip("\n")
+
         if line.startswith("[#"):
-            current_cluster = line
-            points = []
+            current_points = []
+            # Извлекаем номер ошибки из формата [#013]
+            import re
+            match = re.search(r"\[#(\d+)\]", line)
+            current_error_num = match.group(1) if match else None
+
         elif line.strip().startswith("Пункты:"):
-            points = [p.strip() for p in line.split("Пункты:")[1].split(",")]
-        elif line.strip().startswith("- (") and points:
-            for point in points:
-                if point not in errors:
-                    errors[point] = 0
-                errors[point] += 1
-    
-    total_violations = 0
-    for line in lines:
-        if line.startswith("Всего нарушений (кластеров):"):
-            total_violations = int(line.split(":")[1].strip())
-    
-    error_counts = dict(sorted(errors.items()))
-    
+            _, rhs = line.split("Пункты:", 1)
+            pts = [p.strip() for p in rhs.split(",") if p.strip()]
+            current_points = pts
+
+        elif line.strip().startswith("-"):
+            if not current_points:
+                continue
+            desc = line.strip()
+            if desc.startswith("-"):
+                desc = desc[1:].strip()
+            if desc.startswith("(") and desc.endswith(")"):
+                desc = desc[1:-1].strip()
+
+            for pt in current_points:
+                oid = _occ_id(pt, desc)
+                occurrences.append((pt, desc, oid, current_error_num))
+                error_counts[pt] = error_counts.get(pt, 0) + 1
+
+    # сортируем: по критерию «натурально»
+    occurrences.sort(key=lambda x: (_natkey(x[0]), ))
+
+    error_points = []
+    occ_list = []
+    for _, (pt, desc, oid, error_num) in enumerate(occurrences):
+        pdf_url = f"/download_annotated/{doc_id}?point={pt}&occ={oid}" if doc_id else ""
+        error_points.append({
+            "point": pt,
+            "description": desc,
+            "pdf_url": pdf_url,
+            "occ_id": oid,              # <-- НОВОЕ в /result
+            "error_num": error_num,     # <-- НОВОЕ: номер ошибки
+        })
+        occ_list.append({"id": oid, "point": pt, "description": desc})
+
+    total_violations = len(occurrences)
+
     return {
-        "error_points": list(error_counts.keys()),
+        "error_points": error_points,
         "error_counts": error_counts,
         "total_violations": total_violations,
-        "full_report": report_content
+        "full_report": report_content,
+        "occurrences": occ_list,
     }

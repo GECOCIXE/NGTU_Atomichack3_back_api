@@ -163,26 +163,28 @@ def extract_pdf_text_as_dict(pdf_path: str) -> dict:
     doc = fitz.open(pdf_path)
     data: dict[int, list[dict]] = {}
     try:
-        for page_index, page in enumerate(doc, start=1):
-            page_dict = page.get_text("dict")
-            items = []
-            for block in page_dict.get("blocks", []):
-                if block.get("type", 0) != 0:
-                    continue
-                for line in block.get("lines", []):
-                    for span in line.get("spans", []):
-                        text = (span.get("text") or "").strip()
-                        if not text:
-                            continue
-                        bbox = [round(float(v), 2) for v in span.get("bbox", (0, 0, 0, 0))]
-                        items.append({
-                            "text": text,
-                            "bbox": bbox,
-                            "font": span.get("font"),
-                            "size": round(float(span.get("size", 0.0)), 2),
-                        })
-            items.sort(key=lambda it: (it["bbox"][1], it["bbox"][0]))
-            data[page_index] = items
+        # Обрабатываем только первую страницу для критерия 1.1.1
+        page_index = 1
+        page = doc[page_index - 1]  # PyMuPDF использует 0-based индексацию
+        page_dict = page.get_text("dict")
+        items = []
+        for block in page_dict.get("blocks", []):
+            if block.get("type", 0) != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = (span.get("text") or "").strip()
+                    if not text:
+                        continue
+                    bbox = [round(float(v), 2) for v in span.get("bbox", (0, 0, 0, 0))]
+                    items.append({
+                        "text": text,
+                        "bbox": bbox,
+                        "font": span.get("font"),
+                        "size": round(float(span.get("size", 0.0)), 2),
+                    })
+        items.sort(key=lambda it: (it["bbox"][1], it["bbox"][0]))
+        data[page_index] = items
     finally:
         doc.close()
     return data
@@ -272,7 +274,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Extract text from a PDF drawing into a Python dict using PyMuPDF (configurable via YAML).")
     parser.add_argument("pdf", help="Путь к PDF файлу")
-    parser.add_argument("-c", "--config", default="config.yaml", help="Путь к YAML конфигу (по умолчанию: config.yaml)")
+    parser.add_argument("-c", "--config", default="D:\\Atomhack3\\NGTU_Atomichack3_back_api\\scripts\\analysis\\config.yaml", help="Путь к YAML конфигу (по умолчанию: config.yaml)")
     parser.add_argument("-o", "--output", help="Путь для сохранения JSON (по умолчанию вывод в stdout)")
     parser.add_argument("--gen-regex", help="Сгенерировать регекс по русскому названию и выйти (игнорирует PDF)")
     args = parser.parse_args()

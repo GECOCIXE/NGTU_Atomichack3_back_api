@@ -80,21 +80,43 @@ def _is_base_token(text: str) -> bool:
     s = text.strip().strip(".:,;()[]{}<>«»'\"")
     return bool(1 <= len(s) <= 2 and re.fullmatch(r"[A-Za-zА-Яа-я]{1,2}", s))
 
-def _extract_bases(lines: list[dict]) -> list[str]:
+def _extract_bases(lines: list[dict], doc_name: str = None) -> list[str]:
     bases = []
+    doc_name_letters = set()
+    
+    # Если у нас есть имя документа, извлекаем из него буквы
+    if doc_name:
+        # Извлекаем все кириллические буквы из имени документа
+        doc_name_letters = set(re.findall(r'[А-Яа-я]', doc_name.upper()))
+    
     for it in lines:
+        txt = _to_cyr_upper(it["text"])
+        # Проверяем, не является ли текст частью имени документа
+        if doc_name and txt in doc_name_letters:
+            continue
+            
         if _is_base_token(it["text"]):
-            bases.append(_to_cyr_upper(it["text"]))
+            bases.append(txt)
     return bases
 
-def _extract_frame_letters(lines: list[dict]) -> list[str]:
+def _extract_frame_letters(lines: list[dict], doc_name: str = None) -> list[str]:
     letters = []
+    doc_name_letters = set()
+    
+    # Если у нас есть имя документа, извлекаем из него буквы
+    if doc_name:
+        # Извлекаем все кириллические буквы из имени документа
+        doc_name_letters = set(re.findall(r'[А-Яа-я]', doc_name.upper()))
 
     # кандидаты буквенных меток (1–2 буквы)
     letter_tokens = [it for it in lines if _is_base_token(it["text"])]
 
     for it in lines:
         txt = _to_cyr_upper(it["text"].strip())
+        # Проверяем, не является ли текст частью имени документа
+        if doc_name and txt in doc_name_letters:
+            continue
+            
         m = RE_FRAME_TAIL.search(txt)
         if m:
             # нашли, например "0,1 А"
@@ -114,6 +136,27 @@ def _extract_frame_letters(lines: list[dict]) -> list[str]:
                         if "А" <= ch <= "Я":
                             letters.append(ch)
 
+    # Дополнительная проверка: если в строке есть только буква и она находится рядом с допуском
+    for it in lines:
+        txt = _to_cyr_upper(it["text"].strip())
+        # Проверяем, не является ли текст частью имени документа
+        if doc_name and txt in doc_name_letters:
+            continue
+            
+        if _is_base_token(txt):
+            # Проверяем, находится ли эта буква рядом с допуском
+            x0, y0, x1, y1 = it["bbox"]
+            cy = (y0 + y1) / 2
+            for line in lines:
+                line_txt = _to_cyr_upper(line["text"].strip())
+                if RE_TOL_DECIMAL.search(line_txt):
+                    lx0, ly0, lx1, ly1 = line["bbox"]
+                    lcy = (ly0 + ly1) / 2
+                    if lx0 <= x1 and (x1 - lx0) <= HORIZ_PT and abs(lcy - cy) <= VERT_PT:
+                        for ch in txt:
+                            if "А" <= ch <= "Я":
+                                letters.append(ch)
+
     return letters
 
 
@@ -121,14 +164,40 @@ def _extract_frame_letters(lines: list[dict]) -> list[str]:
 # Основная проверка
 # ------------------------
 def check_bases_vs_frames(pdf_path: str) -> dict:
+    # Импортируем необходимые функции из критерия 1.1.1
+    try:
+        from criterions.criterion_1_1_1 import extract_pdf_text_as_dict, filter_titleblock_items, load_config
+        # Загружаем конфигурацию
+        config_path = "./config.yaml"
+        cc = load_config(config_path) if Path(config_path).exists() else None
+        
+        # Извлекаем информацию о документе
+        extracted = extract_pdf_text_as_dict(pdf_path)
+        filtered = filter_titleblock_items(extracted, cc) if cc else {}
+        
+        # Получаем имя документа из первой страницы
+        doc_name = None
+        if 1 in filtered:
+            items = filtered[1]
+            for item in items:
+                if "doc_type_name" in item:
+                    doc_name = item["doc_type_name"]
+                    break
+                elif "text" in item and "doc_type_name" not in item:
+                    # Это может быть название документа
+                    doc_name = item["text"]
+                    break
+    except Exception:
+        doc_name = None
+
     doc = fitz.open(pdf_path)
     report = {"pages": {}, "ok": True}
     try:
         for pageno, page in enumerate(doc, start=1):
             lines = _page_lines_with_bbox(page)
 
-            bases_set  = sorted(set(_extract_bases(lines)))
-            frames_set = sorted(set(_extract_frame_letters(lines)))
+            bases_set  = sorted(set(_extract_bases(lines, doc_name)))
+            frames_set = sorted(set(_extract_frame_letters(lines, doc_name)))
 
             missing = sorted(set(frames_set) - set(bases_set))  # в рамках есть, базы нет → ошибка
             extra   = sorted(set(bases_set) - set(frames_set))  # база есть, не используется → не критично

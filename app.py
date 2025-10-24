@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 import os
 from scripts.crud import SECRET_KEY, ALGORITHM
-from routers import auth, upload , history, result, download
+from routers import auth, upload, history, result, download, decisions, requirements_stats, process_analysis, export_csv, admin_panel, errors
 from scripts.models import Base
 from scripts.db import engine
 
@@ -26,6 +26,7 @@ app.add_middleware(
 
 PUBLIC_PATHS = {
     "/login",
+    "/reg"
 }
 
 def _strip_bearer(auth_header: str | None):
@@ -64,3 +65,9 @@ app.include_router(upload.router)
 app.include_router(history.router)
 app.include_router(result.router)
 app.include_router(download.router)
+app.include_router(decisions.router)
+app.include_router(requirements_stats.router)
+app.include_router(process_analysis.router)
+app.include_router(errors.router)
+app.include_router(export_csv.router)
+app.include_router(admin_panel.router)
