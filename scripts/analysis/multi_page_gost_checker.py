@@ -21,11 +21,11 @@ class GostResult(BaseModel):
 GOST_RULES = {
     "1.1.9": {
         "description": "Правило ГОСТ 1.1.9: Проверка наличия знака √ в скобках в углу шероховатости при наличии указанной шероховатости.",
-        "reference_image": "D:\\Atomhack3\\NGTU_Atomichack3_back_api\\scripts\\analysis\\ref-1.1.7-correct.png"  # Изображение, где правило 1.1.9 выполнено ВЕРНО
+        "reference_image": "./scripts/analysis/ref-1.1.7-correct.png"  # Изображение, где правило 1.1.9 выполнено ВЕРНО
     },
     "1.1.7": {
         "description": "Правило ГОСТ 2.308: Проверка наличия дополнительной стрелки при простановке допусков формы и расположения.",
-        "reference_image": "D:\\Atomhack3\\NGTU_Atomichack3_back_api\\scripts\\analysis\\ref-1.1.7-correct.png"  # Изображение, где правило 1.1.7 выполнено ВЕРНО
+        "reference_image": "./scripts/analysis/ref-1.1.7-correct.png"  # Изображение, где правило 1.1.7 выполнено ВЕРНО
     }
     # Можете добавлять сюда новые правила по аналогии
     # "номер_госта": { "description": "...", "reference_image": "..." }

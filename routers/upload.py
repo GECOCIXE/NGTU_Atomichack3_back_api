@@ -13,6 +13,7 @@ from scripts.crud import (
     add_decision,
 )
 from scripts.analysis.main import make_report_files, pipeline
+from scripts.analysis.drawing_comparator import compare_drawings
 from scripts.parse_report import parse_report
 from datetime import datetime
 import os, glob
@@ -115,10 +116,12 @@ async def upload_file(
 
     upload_date = datetime.now()
 
+    similar = bool
+
     if doc_id is None:
         # создаём новый документ и первую версию
         doc = create_document(db, user.id, file.filename, upload_date)
-        from scripts.crud import list_versions_for_document
+        # используем уже импортированную функцию из заголовка файла
         ver = list_versions_for_document(db, doc.id)[0]
 
         # если кто-то попытается прислать fixed_ids на самом первом аплоаде — некуда валидировать
@@ -160,6 +163,44 @@ async def upload_file(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # === СРАВНЕНИЕ ЧЕРТЕЖЕЙ С ПРЕДЫДУЩЕЙ ВЕРСИЕЙ ===
+    # Если это не первая версия (есть предыдущие версии), сравниваем с предыдущей версией
+    if doc_id is not None:  # Обновление существующего документа
+        versions = list_versions_for_document(db, doc.id)
+        if len(versions) > 1:  # Это как минимум вторая версия (есть предыдущая)
+            # Получаем предыдущую версию (вторая по порядку, так как первая - текущая)
+            previous_version = versions[1]  # В списке версии по убыванию номера, поэтому [1] - предыдущая
+            
+            if previous_version and previous_version.filename:
+                previous_file_path = f"{_version_dir(doc.id, previous_version.version_number)}/{previous_version.filename}"
+                
+                # Проверяем, что предыдущий файл существует
+                if os.path.exists(previous_file_path):
+                    try:
+                        # Сравниваем текущую и предыдущую версии чертежей
+                        comparison_result = compare_drawings(previous_file_path, file_path)
+                        print(comparison_result.confidence, comparison_result.similar)
+                        
+                        # Если чертежи НЕ похожи, добавляем решение с сообщением о смене чертежа
+                        if not comparison_result.similar:
+                            add_decision(
+                                db,
+                                version_id=ver.id,
+                                error_point="system",
+                                status="rejected",
+                                author="Цифровой помощник конструктора",
+                                author_role="norm_controller",
+                                comment=f"Обнаружена смена чертежа: текущий файл отличается от предыдущего. Уверенность: {comparison_result.confidence:.2f}. Прислан абсолютно другой чертеж.",
+                                timestamp=datetime.utcnow(),
+                            )
+                            similar = False
+                        else:
+                            similar = True
+                    except Exception as e:
+                        # Если не удалось сравнить чертежи, логируем ошибку и продолжаем
+                        print(f"Ошибка при сравнении чертежей: {e}")
+                        # Продолжаем обработку, чтобы случайная ошибка сравнения не останавлиала загрузку
+
     # === Сохраняем "заявки" разработчика на исправления ===
     author_name = user.full_name or user.login
 
@@ -194,7 +235,8 @@ async def upload_file(
 
     # === Запускаем анализ (analysis-скрипты НЕ трогаем) ===
     # Вызов остаётся совместимым с вашими скриптами: передаём doc.id
-    background_tasks.add_task(_run_analysis_and_update, ver.id, file_path)
+    if similar:
+        background_tasks.add_task(_run_analysis_and_update, ver.id, file_path)
 
     return {
         "document_id": doc.id,

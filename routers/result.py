@@ -72,7 +72,8 @@ def get_result(doc_id: int, db: Session = Depends(get_db), current_user: str = D
 
     # ---- пути ПЕРВОЙ версии (для file_url/annotated) ----
     first_base = f"data/original/{doc.id}/v{first_v.version_number}"
-    file_url = first_v.report_path if first_v and first_v.report_path else f"{first_base}/{first_v.filename or ''}"
+    # file_url должен указывать на исходный PDF файл, а не на отчет
+    file_url = f"{first_base}/{first_v.filename or ''}" if first_v else ""
     first_ann_name = os.path.splitext(first_v.filename or "document")[0] + ".annotated.pdf"
     file_url_annotated = first_v.ann_pdf_path if first_v and first_v.ann_pdf_path else ""
 
@@ -240,7 +241,8 @@ def get_result(doc_id: int, db: Session = Depends(get_db), current_user: str = D
         occ_point_map = _occ_point_map_for_version(ver)
 
         base_dir = f"data/original/{doc.id}/v{ver.version_number}"
-        original_path = ver.report_path if ver and ver.report_path else f"{base_dir}/{ver.filename or ''}"
+        # original_path должен указывать на исходный PDF файл, а не на отчет
+        original_path = f"{base_dir}/{ver.filename or ''}" if ver else ""
         annotated_path = ver.ann_pdf_path if ver and ver.ann_pdf_path else ""
 
         def _ts_key(d):

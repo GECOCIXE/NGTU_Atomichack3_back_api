@@ -38,7 +38,7 @@ def pipeline(pdf_path: str) -> dict:
     output: dict = {}
 
     out_1_1_1 = extract_pdf_text_as_dict(pdf_path)
-    res_1_1_1 = filter_titleblock_items(out_1_1_1, load_config("D:\\Atomhack3\\NGTU_Atomichack3_back_api\\scripts\\analysis\\config.yaml"))
+    res_1_1_1 = filter_titleblock_items(out_1_1_1, load_config("./scripts/analysis/config.yaml"))
     output["1.1.1"] = res_1_1_1
 
     output["1.1.2"] = run_check_1_1_2(pdf_path)
